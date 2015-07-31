@@ -13,6 +13,8 @@ pthread_mutex_t mutex ;     /*定义互斥锁*/
 
 pthread_cond_t cond ;       /*定义条件变量*/
 
+int flag=0;
+
 void thread1(void *arg) ;
 
 void thread2(void *arg) ;
@@ -32,6 +34,9 @@ int main(void)
     while(count-- > 0) {
         sleep(1);
         pthread_cond_signal (&cond) ;         /*循环触发条件变量，激活等待条件变量的线程*/
+        if(flag == 2) {
+            break;
+        }
     }
 
     return 0 ;
@@ -49,9 +54,7 @@ void thread1(void *arg)
         printf ("thread1 get the condition\n") ;
         pthread_mutex_unlock (&mutex) ;         /*给互斥锁解锁*/
     }
-    pthread_mutex_lock (&mutex) ;
-
-    pthread_mutex_unlock (&mutex) ;
+    flag++ ;
 
     pthread_cleanup_pop (0) ;
 }
@@ -68,6 +71,7 @@ void thread2(void *arg)
         printf ("thread2 get the condition\n") ;
         pthread_mutex_unlock (&mutex) ;         /*给互斥锁解锁*/
     }
+    flag++ ;
 
     pthread_cleanup_pop (0) ;
 }
