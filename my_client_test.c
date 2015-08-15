@@ -47,6 +47,14 @@ struct cmd {
     char cmd_data[BUFMAX] ;
 } ;
 
+/*聊天记录*/
+struct history {
+    char history_from[IDMAX] ;
+    char history_to[IDMAX] ;
+    char history_time[BUFMAX] ;
+    char history_data[DATAMAX] ;
+} ;
+
 
 /*全局变量*/
 struct online_list  *online_list_PHEAD = NULL ;
@@ -172,6 +180,7 @@ int main(void)
                 exit (1) ;
             }
             else {
+                getchar () ;
                 /*聊天界面*/
                 client_chat (fd) ;
             }
@@ -240,6 +249,73 @@ struct online_list  *online_list_discover (struct online_list *phead, char user_
 
 
 /********************发送消息函数************************/
+/*存储聊天历史记录，源ID，目标ID，消息数据*/
+ int client_history_write (char from[IDMAX], char to[IDMAX], char data[DATAMAX])
+ { 
+     struct history  history_temp ;
+     char path[BUFMAX], time_temp[BUFMAX], data_temp[DATAMAX] ;
+     FILE *fp =NULL ;
+     printf ("history_from :%s\nhistory_to :%s\ndata :%s\n", from, to, data) ;
+     if(strcmp (to, ALL) == 0) {
+         memset (&history_temp, 0, sizeof (struct history)) ;
+         if((fp = fopen ("group_chat_history_client.txt", "ab+")) == NULL) {
+             my_err ("fopen", __LINE__) ;
+             /*创建记录文件*/
+             if((fp = fopen (path, "w")) == NULL) {
+                 my_err ("fopen", __LINE__) ;
+                 return -1 ;
+             }
+             fclose (fp) ;
+             if((fp = fopen (path, "ab+")) == NULL) {
+                 my_err ("fopen", __LINE__) ;
+                 return -1 ;
+             }
+         }
+         client_cmddata_cut (data, time_temp, data_temp) ;printf ("time:%s\ndata:%s\n", time_temp, data_temp) ;
+         strcpy (history_temp.history_from, from) ;
+         strcpy (history_temp.history_to, to) ;
+         strcpy (history_temp.history_time, time_temp) ;
+         strcpy (history_temp.history_data, data_temp) ;
+         if(fwrite (&history_temp, sizeof (struct history), 1, fp) <= 0) {
+             my_err ("fwrite", __LINE__) ;
+             return -1 ;
+         }printf ("group_client write success\n") ;
+         fclose (fp) ;
+         return 0 ;
+     }
+     strcpy (path, from) ;
+     strcat (path, "_chat_history.txt") ;
+     memset (&history_temp, 0, sizeof (struct history)) ;
+     if((fp = fopen (path, "ab+")) == NULL) {
+         my_err ("fopen", __LINE__) ;
+         /*创建记录文件*/
+         if((fp = fopen (path, "w")) == NULL) {
+             my_err ("fopen", __LINE__) ;
+             return -1 ;
+         }
+         fclose (fp) ;
+         if((fp = fopen (path, "ab+")) == NULL) {
+             my_err ("fopen", __LINE__) ;
+             return -1 ;
+         }
+     }
+     client_cmddata_cut (data, time_temp, data_temp) ;
+     strcpy (history_temp.history_from, from) ;
+     strcpy (history_temp.history_to, to) ;
+     strcpy (history_temp.history_time, time_temp) ;
+     strcpy (history_temp.history_data, data_temp) ;
+     if(fwrite (&history_temp, sizeof (struct history), 1, fp) <= 0) {
+         my_err ("fwrite", __LINE__) ;
+         return -1 ;
+     }
+     fclose (fp) ;
+     printf ("history write succsee\n") ;
+ }
+
+
+
+
+
 /*获得用户输入的命令*/
 void my_gets (char buf[BUFMAX])
 {
@@ -255,19 +331,26 @@ void my_gets (char buf[BUFMAX])
 
 
 /*发送命令包函数*/
-int client_send (int fd, char buf[BUFMAX], char cmd_from[IDMAX], char cmd_to[IDMAX], short flag)
+int client_send (int fd, char data[DATAMAX], char cmd_from[IDMAX], char cmd_to[IDMAX], short flag)
 {
     struct cmd  cmdtemp ;
     memset (&cmdtemp, 0, sizeof (struct cmd)) ;
-    strcpy (cmdtemp.cmd_from, cmd_from) ;printf ("from:%s\n",cmd_from) ;
-    strcpy (cmdtemp.cmd_to, cmd_to) ;printf ("B\n") ;
-    strcpy (cmdtemp.cmd_data, buf) ;printf ("C\n") ;
-    cmdtemp.cmd_flag = flag ;printf ("D\n") ;
+    strcpy (cmdtemp.cmd_from, cmd_from) ;
+    strcpy (cmdtemp.cmd_to, cmd_to) ;
+    strcpy (cmdtemp.cmd_data, data) ;
+    cmdtemp.cmd_flag = flag ;printf ("%s\n%s\n%s\n%d\n", data, cmd_from, cmd_to, flag) ;
     if(send (fd, &cmdtemp, sizeof (struct cmd), 0) < 0) {
         my_err ("send", __LINE__) ;
         return -1 ;
     }
-    printf ("i am end send \n") ;
+    /*消息类命令包，聊天记录*/
+    if(flag == MESSAGE) {
+        if(client_history_write (cmd_from, cmd_to, data) < 0) {
+            my_err ("client_history_write", __LINE__) ;
+            return -1 ;
+        }
+    }
+    printf ("send success\n") ;
 }
 
 
@@ -284,7 +367,6 @@ int client_cmddata_cat (char buf[BUFMAX], char buf1[BUFMAX], char buf2[BUFMAX])
     }
     strcpy (buf, buf1) ;
     strcat (buf, buf2) ;
-    printf ("buf:%s\n", buf) ;
     return 0 ;
 }
 
@@ -366,16 +448,27 @@ int client_login (int fd)
     pthread_cond_wait (&cond, &mutex) ;
     /*登陆成功*/
     if(login_state == 1) {
+        /*创建该用户文件夹*/
+        mkdir (user_ID, 0744) ;
+        /*将用户文件夹作为工作目录*/
+        if(chdir (user_ID) < 0) {
+            my_err ("chdir", __LINE__) ;
+            return -1 ;
+        }
         /*解开互斥锁*/
         pthread_mutex_unlock (&mutex) ;
         return 0 ;
     }
+    /*登陆失败*/
     else {
         /*解开互斥锁*/
         pthread_mutex_unlock (&mutex) ;
         return -1 ;
     }
 }
+
+
+
 
 /*从在线用户列表中找出目标用户信息*/
 struct online_list  *client_chat_discover (struct online_list  *online_list_phead, const char user[NAMEMAX])
@@ -386,7 +479,6 @@ struct online_list  *client_chat_discover (struct online_list  *online_list_phea
         return NULL ;
     }
     while(online_list_ptemp != NULL) {
-        printf ("user_ID:%s\n", online_list_ptemp -> user_ID) ;
         if(strcmp (online_list_ptemp -> user_ID, user) == 0 || strcmp (online_list_ptemp -> user_name, user) == 0) {
             break ;
         }
@@ -420,7 +512,7 @@ int client_chat_cut (const char buf[BUFMAX], char user[NAMEMAX], char data[DATAM
             user[n++] = buf[i] ;
         }
         i++ ;
-    }printf ("user:%s,data%s\n", user, data) ;
+    }
     /*字符串中没有':'，格式错误*/
     if(data_state == 0) {
         return -1 ;
@@ -432,13 +524,24 @@ int client_chat_cut (const char buf[BUFMAX], char user[NAMEMAX], char data[DATAM
 }
 
 
+/*获取时间字符串*/
+void client_time_get (char buf[BUFMAX])
+{
+    struct tm *t ;
+    time_t t_now ;
+    time (&t_now) ;
+    t = localtime (&t_now) ;
+    sprintf (buf, "%.4d-%.2d-%.2d-%.2d-%.2d-%.2d", t -> tm_year+1900, t -> tm_mon+1, t -> tm_mday, t -> tm_hour, t -> tm_min, t -> tm_sec) ;
+}
+
+
 /*私聊消息发送*/
 int client_chat_person (int sock_fd, char data[DATAMAX])
 {   
     time_t  t ;
     int i = 0, n = 0 ;
     struct online_list  *online_list_ptemp = NULL ;
-    char user[NAMEMAX], buf[DATAMAX], time_temp[30], cmd_data[DATAMAX];
+    char user[NAMEMAX], buf[DATAMAX], time_temp[BUFMAX], cmd_data[DATAMAX];
     /*从命令中解析出目标昵称或ID，和欲发送的字符串*/
     if(client_chat_cut (data, user, buf) < 0) {
         my_err ("client_chat_cut", __LINE__) ;
@@ -452,9 +555,8 @@ int client_chat_person (int sock_fd, char data[DATAMAX])
             return -1 ;
         }
         else {
-            t = time (&t) ;
-            strcpy (time_temp, ctime (&t)) ;
-            client_cmddata_cat (cmd_data, time_temp, data) ;
+            client_time_get (time_temp) ;
+            client_cmddata_cat (cmd_data, time_temp, buf) ;
             if(client_send (sock_fd, cmd_data, online_list_self.user_ID, online_list_ptemp -> user_ID, MESSAGE) < 0) {
                 printf ("发送失败\n") ;
                 return -1 ;
@@ -471,9 +573,11 @@ int client_chat_person (int sock_fd, char data[DATAMAX])
 /*聊天函数*/
 int client_chat (int sock_fd)
 {
-    char buf[BUFMAX], user[NAMEMAX], data[DATAMAX], time_temp[30], cmd_data[DATAMAX];
+    char buf[BUFMAX], user[NAMEMAX], data[DATAMAX], time_temp[BUFMAX], cmd_data[DATAMAX];
     while(1) {
         memset (buf, 0, sizeof (buf)) ;
+        memset (data, 0, sizeof (data)) ;
+        printf (">>>") ;
         my_gets (buf) ;
         /*向某人发送的私聊消息*/
         if(buf[0] == '@') {
@@ -482,8 +586,20 @@ int client_chat (int sock_fd)
                 continue ;
             }
         }
+        /*显示在线用户*/
+        else if(strcmp (buf, "online") == 0) {
+            struct online_list  *online_list_ptemp = online_list_PHEAD ;
+            while(online_list_ptemp != NULL) {
+                printf ("online user\nID:%s\nname:%s\n", online_list_ptemp -> user_ID, online_list_ptemp -> user_name) ;
+                online_list_ptemp = online_list_ptemp -> next ;
+            }
+        }
+        /*群聊消息*/
         else {
-            if(client_send (sock_fd, buf, online_list_self.user_ID, "0", MESSAGE) < 0) {
+            memset (time_temp, 0, sizeof (time_temp)) ;
+            client_time_get (time_temp) ;
+            client_cmddata_cat (cmd_data, time_temp, buf) ;
+            if(client_send (sock_fd, cmd_data, online_list_self.user_ID, "0", MESSAGE) < 0) {
                 printf ("发送失败\n") ;
             }
             continue ;
@@ -496,17 +612,25 @@ int client_chat (int sock_fd)
 /*处理MESSAGE消息包*/
 int client_message (struct cmd  cmd_temp)
 {
+    char time_temp[BUFMAX], data_temp[BUFMAX] ;
+    if(client_cmddata_cut (cmd_temp.cmd_data, time_temp, data_temp) < 0) {
+        my_err ("client_cmddata_cut", __LINE__) ;
+        return -1 ;
+    }
     /*消息来源是服务器,系统消息*/
     if(strcmp (cmd_temp.cmd_from, ALL) == 0) {
         fprintf (stdout, "服务器：%s\n", cmd_temp.cmd_data) ;
     }
     /*消息目标为群发,群消息*/
     else if(strcmp(cmd_temp.cmd_to, ALL) == 0) {
-        fprintf (stdout, "%s : %s\n", cmd_temp.cmd_from, cmd_temp.cmd_data) ;
+        fprintf (stdout, "%s : %s\n", cmd_temp.cmd_from, data_temp) ;
     }
     /*消息目标为自己，私聊消息*/
     else {
-        fprintf (stdout, "%s @ you :%s\n", cmd_temp.cmd_from, cmd_temp.cmd_data) ;
+        fprintf (stdout, "%s @ you :%s\n", cmd_temp.cmd_from, data_temp) ;
+    }
+    if(client_history_write (cmd_temp.cmd_from, cmd_temp.cmd_to, cmd_temp.cmd_data) < 0) {
+        return -1 ;
     }
     return 0 ;
 }
@@ -543,7 +667,7 @@ int client_login_message (struct cmd cmd_temp)
         login_state = 1 ;
         fprintf (stdout, "系统消息：登陆成功\n") ;
         /*分割信息包数据，解析出登陆成功的用户的ID和昵称*/
-        client_cmddata_cut (cmd_temp.cmd_data, online_list_self.user_ID, online_list_self.user_name) ;printf ("AA\n") ;
+        client_cmddata_cut (cmd_temp.cmd_data, online_list_self.user_ID, online_list_self.user_name) ;
     }
     /*解开互斥锁，并激活条件变量*/
     pthread_mutex_unlock (&mutex) ;
@@ -578,21 +702,17 @@ int client_register_message (struct cmd  cmd_temp)
 /*接收命令包，根据flag分配函数*/
 int client_recv (int *sock_fd)
 {
-    struct cmd  cmd_temp ;printf ("i start recv\n") ;
-    while(recv (*sock_fd, &cmd_temp, sizeof (struct cmd), 0) > 0) {
-        printf ("i get a message\n") ;
-        printf ("%d\n", cmd_temp.cmd_flag) ;
+    struct cmd  cmd_temp ;
+    while(recv (*sock_fd, &cmd_temp, sizeof (struct cmd), 0) > 0) {printf ("recv bag flag = %d\n", cmd_temp.cmd_flag) ;
         switch(cmd_temp.cmd_flag) {
             case MESSAGE :
                 client_message (cmd_temp) ;
                 break ;
             case ONLINE :
-                printf ("online message\n") ;
                 client_online (cmd_temp) ;
                 break ;
             /*客户端收到REGISTER消息包，说明登陆是否失败*/
             case LOGIN :
-                printf ("login_message\n") ;
                 client_login_message (cmd_temp) ;
                 break ;
             case REGISTER :
