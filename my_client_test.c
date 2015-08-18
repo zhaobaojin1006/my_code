@@ -82,6 +82,13 @@ struct online_list  *online_list_discover (struct online_list *phead, char user_
 
 
 /**************发送消息函数**************/
+/*按任意键继续函数*/
+void client_pause (void) ;
+
+/*根据ID查询聊天记录，参数为"0"时表示查询群聊记录*/  
+int client_history_read (char user_ID[IDMAX]) ;
+
+
 /*获得用户输入的命令*/
 void my_gets (char buf[BUFMAX]) ;
 
@@ -180,7 +187,9 @@ int main(void)
                 exit (1) ;
             }
             else {
-                getchar () ;
+                printf ("输入任意键继续。\n") ;
+                client_pause () ;
+                printf ("\033[2J") ;
                 /*聊天界面*/
                 client_chat (fd) ;
             }
@@ -237,6 +246,9 @@ struct online_list  *online_list_del (struct online_list *phead, struct online_l
 struct online_list  *online_list_discover (struct online_list *phead, char user_ID[IDMAX])
 {
     struct online_list *ptemp = phead ;
+    if(phead == NULL) {
+        printf ("no online list\n") ;
+    }
     while(ptemp != NULL) {
         if(strcmp (ptemp -> user_ID, user_ID)) {
             return ptemp ;
@@ -249,6 +261,103 @@ struct online_list  *online_list_discover (struct online_list *phead, char user_
 
 
 /********************发送消息函数************************/
+/*按任意键继续函数*/
+void client_pause (void)
+{
+    /*取消回显*/
+    system ("stty -echo") ;
+    /*无缓冲模式，接收到字符立即返回*/
+    system ("stty -icanon") ;
+    getchar () ;
+    system ("stty echo") ;
+    system ("stty icanon") ;
+  
+}
+
+
+
+
+/*获取密码的函数*/
+void passwd_gets (char passwd[PASSWARDMAX])
+{
+    char buf[PASSWARDMAX] ;
+    char c ;
+    int i = 0 ;
+    /*取消回显*/
+    system ("stty -echo") ;
+    /*无缓冲模式，接收到字符立即返回*/
+    system ("stty -icanon") ;
+    do{
+        c = getchar () ;
+        /*127是删除键的键值*/
+        if(c == 127) {
+            /*如果i>0 说明已有输入字符，数组下标-1*/
+            if(i > 0) {
+                printf ("\b \b") ;
+                i-- ;
+            }
+        }
+        /*如果输入的是普通字符*/
+        else if(c != '\n'){
+            /*输入不能超过密码字符个数上限*/
+            if(i >= PASSWARDMAX) {
+                continue ;
+            }
+            printf ("*") ;
+            buf[i++] = c ;
+        }
+    }while(c != '\n') ;
+    system ("stty echo") ;
+    system ("stty icanon") ;
+    buf[i] = '\0' ;
+    /*回退光标后， buf中有冗余数据*/
+    strcpy (passwd, buf) ;
+}
+
+
+
+/*根据参数大小接收字符串*/
+void client_gets (char data[DATAMAX], int size)
+{
+    char buf[DATAMAX] ;
+    char c ;
+    int i = 0 ;
+    /*取消回显*/
+    system ("stty -echo") ;
+    /*无缓冲模式，接收到字符立即返回*/
+    system ("stty -icanon") ;
+    do{
+        c = getchar () ;
+        /*127是删除键的键值*/
+        if(c == 127) {
+            /*如果i>0 说明已有输入字符，数组下标-1*/
+            if(i > 0) {
+                printf ("\b \b") ;
+                i-- ;
+            }
+        }
+        /*如果输入的是普通字符*/
+        else if(c != '\n'){
+            /*输入不能超过密码字符个数上限*/
+            if(i >= size) {
+                continue ;
+            }
+            printf ("%c", c) ;
+            buf[i++] = c ;
+        }
+    }while(c != '\n') ;
+    system ("stty echo") ;
+    system ("stty icanon") ;
+    buf[i] = '\0' ;
+    /*回退光标后， buf中有冗余数据*/
+    strcpy (data, buf) ;
+
+}
+
+
+
+
+
 /*存储聊天历史记录，源ID，目标ID，消息数据*/
  int client_history_write (char from[IDMAX], char to[IDMAX], char data[DATAMAX])
  { 
@@ -258,7 +367,9 @@ struct online_list  *online_list_discover (struct online_list *phead, char user_
      printf ("history_from :%s\nhistory_to :%s\ndata :%s\n", from, to, data) ;
      if(strcmp (to, ALL) == 0) {
          memset (&history_temp, 0, sizeof (struct history)) ;
-         if((fp = fopen ("group_chat_history_client.txt", "ab+")) == NULL) {
+         strcpy (path, online_list_self.user_ID) ;
+         strcat (path, "_group_chat_history.txt") ;
+         if((fp = fopen (path, "ab+")) == NULL) {
              my_err ("fopen", __LINE__) ;
              /*创建记录文件*/
              if((fp = fopen (path, "w")) == NULL) {
@@ -283,7 +394,8 @@ struct online_list  *online_list_discover (struct online_list *phead, char user_
          fclose (fp) ;
          return 0 ;
      }
-     strcpy (path, from) ;
+     /*发送或者接收消息时，记录聊天记录进用户聊天历史文件中*/
+     strcpy (path, online_list_self.user_ID) ;
      strcat (path, "_chat_history.txt") ;
      memset (&history_temp, 0, sizeof (struct history)) ;
      if((fp = fopen (path, "ab+")) == NULL) {
@@ -311,6 +423,69 @@ struct online_list  *online_list_discover (struct online_list *phead, char user_
      fclose (fp) ;
      printf ("history write succsee\n") ;
  }
+
+
+/*根据ID查询聊天记录，参数为"0"时表示查询群聊记录*/  
+int client_history_read (char user_ID[IDMAX])
+{
+    struct history  history_temp ;
+    int fd ;
+    char path[BUFMAX] ;
+    int len = 1;
+    /*查询群聊记录*/
+    if(strcmp (user_ID, ALL) == 0) {
+        strcpy (path, online_list_self.user_ID) ;
+        strcat (path, "_group_chat_history.txt") ;
+        if((fd = open (path, O_RDONLY | O_CREAT, 0644)) < 0) {
+            my_err ("open", __LINE__) ;
+            return -1 ;
+        }
+        while(len != 0) {
+            memset (&history_temp, 0, sizeof (struct history)) ;
+            if((len = read (fd, &history_temp, sizeof (struct history))) < 0) {
+                my_err ("read", __LINE__) ;
+                return -1 ;
+            }
+            if(strcmp (history_temp.history_to, ALL) == 0) {
+                printf ("时间：%s\n%s：%s\n", history_temp.history_time, history_temp.history_from, history_temp.history_data) ;
+            }
+        }
+    }
+    /*查询私聊记录*/
+    else {
+        strcpy (path, online_list_self.user_ID) ;
+        strcat (path, "_chat_history.txt") ;
+        if((fd = open (path, O_RDONLY)) < 0) {
+            printf ("无此用户聊天记录\n") ;
+            return -1 ;
+        }
+        while(len != 0) {
+            memset (&history_temp, 0, sizeof (struct history)) ;
+            if((len = read (fd, &history_temp, sizeof (struct history))) < 0) {
+                my_err ("read", __LINE__) ;
+                return -1 ;
+            }
+            else if(len == 0) {
+                printf ("无更多聊天记录\n按任意键继续...\n") ;
+                getchar () ;
+                client_pause () ;
+                printf ("\033[2J") ;
+            }
+            else {
+                /*筛选出与目标用户的聊天记录*/
+                if(strcmp (history_temp.history_from ,user_ID) == 0) {
+                    printf ("时间：%s\n%s @ you：%s\n\n", history_temp.history_time, user_ID, history_temp.history_data) ;
+                }
+                else if(strcmp (history_temp.history_to, user_ID) == 0) {
+                    printf ("时间：%s\nyou @ %s：%s\n\n", history_temp.history_time, user_ID, history_temp.history_data) ;
+                }
+            }
+        }
+    }
+    return 0 ;
+}
+
+
 
 
 
@@ -408,10 +583,12 @@ int client_register (int fd)
 {
     int i = 0 ;
     char user_name[NAMEMAX], user_passward[PASSWARDMAX], buf[BUFMAX] ;
+    getchar () ;
     printf ("请输入昵称(最长10个字符)：\n") ;
-    scanf ("%s", user_name) ;
+    client_gets (user_name, NAMEMAX-1) ;
+    printf ("\n") ;
     printf ("请输入密码(最长20个字符)：\n") ;
-    scanf ("%s", user_passward) ;
+    passwd_gets (user_passward) ;
     client_cmddata_cat (buf, user_name, user_passward) ;
     if(client_send (fd, buf, "0", "0", REGISTER) < 0) {
         return -1 ;
@@ -436,10 +613,12 @@ int client_register (int fd)
 int client_login (int fd)
 {
     char user_ID[IDMAX], user_passward[IDMAX], buf[BUFMAX] ;
+    getchar () ;
     printf ("请输入用户ID：") ;
-    scanf ("%s", user_ID) ;
+    client_gets (user_ID, IDMAX-1) ;
+    printf ("\n") ;
     printf ("请输入用户密码:") ;
-    scanf ("%s", user_passward) ;
+    passwd_gets (user_passward) ;
     client_cmddata_cat (buf, user_ID, user_passward) ;
     if(client_send (fd, buf, "0", "0", LOGIN) < 0) {
         return -1 ;
@@ -552,7 +731,7 @@ int client_chat_person (int sock_fd, char data[DATAMAX])
         /*从在线列表中找出目标用户信息*/
         if((online_list_ptemp = client_chat_discover (online_list_PHEAD, user)) == NULL) {
             printf ("此用户不在线或无此用户信息\n") ;
-            return -1 ;
+            return 1 ;
         }
         else {
             client_time_get (time_temp) ;
@@ -581,28 +760,40 @@ int client_chat (int sock_fd)
         my_gets (buf) ;
         /*向某人发送的私聊消息*/
         if(buf[0] == '@') {
-            if(client_chat_person (sock_fd, buf)) {
+            if(client_chat_person (sock_fd, buf) < 0) {
                 my_err ("client_chat_person", __LINE__) ;
                 continue ;
             }
         }
-        /*显示在线用户*/
+        /*打印在线用户*/
         else if(strcmp (buf, "online") == 0) {
             struct online_list  *online_list_ptemp = online_list_PHEAD ;
             while(online_list_ptemp != NULL) {
-                printf ("online user\nID:%s\nname:%s\n", online_list_ptemp -> user_ID, online_list_ptemp -> user_name) ;
+                printf ("在线用户：\nID：%s\n昵称:%s\n", online_list_ptemp -> user_ID, online_list_ptemp -> user_name) ;
                 online_list_ptemp = online_list_ptemp -> next ;
             }
         }
+        /*根据ID，打印聊天记录*/
+        else if(strcmp (buf, "history") == 0) {
+            char user_ID[IDMAX] ;
+            printf ("请输入要查询的ID\n") ;
+            scanf ("%s", user_ID) ;
+            client_history_read (user_ID) ;
+        }
         /*群聊消息*/
-        else {
+        else if(buf[0] == ':') {
             memset (time_temp, 0, sizeof (time_temp)) ;
             client_time_get (time_temp) ;
-            client_cmddata_cat (cmd_data, time_temp, buf) ;
+            client_cmddata_cat (cmd_data, time_temp, &buf[1]) ;
             if(client_send (sock_fd, cmd_data, online_list_self.user_ID, "0", MESSAGE) < 0) {
                 printf ("发送失败\n") ;
             }
             continue ;
+        }
+        /*退出命令*/
+        else if(strcmp (buf, "quit") == 0) {
+            close (sock_fd) ;
+            return 0 ;
         }
     }
 }
@@ -613,6 +804,7 @@ int client_chat (int sock_fd)
 int client_message (struct cmd  cmd_temp)
 {
     char time_temp[BUFMAX], data_temp[BUFMAX] ;
+    struct online_list *online_list_ptemp = NULL ;
     if(client_cmddata_cut (cmd_temp.cmd_data, time_temp, data_temp) < 0) {
         my_err ("client_cmddata_cut", __LINE__) ;
         return -1 ;
@@ -623,14 +815,20 @@ int client_message (struct cmd  cmd_temp)
     }
     /*消息目标为群发,群消息*/
     else if(strcmp(cmd_temp.cmd_to, ALL) == 0) {
+
         fprintf (stdout, "%s : %s\n", cmd_temp.cmd_from, data_temp) ;
+        if(client_history_write (cmd_temp.cmd_from, cmd_temp.cmd_to, cmd_temp.cmd_data) < 0) {
+            return -1 ;
+        }
+
     }
     /*消息目标为自己，私聊消息*/
     else {
         fprintf (stdout, "%s @ you :%s\n", cmd_temp.cmd_from, data_temp) ;
-    }
-    if(client_history_write (cmd_temp.cmd_from, cmd_temp.cmd_to, cmd_temp.cmd_data) < 0) {
-        return -1 ;
+        if(client_history_write (cmd_temp.cmd_from, cmd_temp.cmd_to, cmd_temp.cmd_data) < 0) {
+            return -1 ;
+        }
+
     }
     return 0 ;
 }
