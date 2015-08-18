@@ -89,10 +89,6 @@ void client_pause (void) ;
 int client_history_read (char user_ID[IDMAX]) ;
 
 
-/*获得用户输入的命令*/
-void my_gets (char buf[BUFMAX]) ;
-
-
 /*发送命令包函数*/
 int client_send (int fd, char buf[BUFMAX], char cmd_from[IDMAX], char cmd_to[IDMAX], short flag) ;
 
@@ -489,22 +485,6 @@ int client_history_read (char user_ID[IDMAX])
 
 
 
-
-
-/*获得用户输入的命令*/
-void my_gets (char buf[BUFMAX])
-{
-    int i = 0 ;
-    while((buf[i++] = getchar ()) != '\n') {
-        if(i >= (BUFMAX - 100)) {
-            break ;
-        }
-    }
-    buf[i-1] = '\0' ;
-}
-
-
-
 /*发送命令包函数*/
 int client_send (int fd, char data[DATAMAX], char cmd_from[IDMAX], char cmd_to[IDMAX], short flag)
 {
@@ -724,7 +704,7 @@ int client_chat_person (int sock_fd, char data[DATAMAX])
     /*从命令中解析出目标昵称或ID，和欲发送的字符串*/
     if(client_chat_cut (data, user, buf) < 0) {
         my_err ("client_chat_cut", __LINE__) ;
-        printf ("命令格式错误") ;
+        printf ("命令格式错误\n") ;
         return -1  ;
     }
     else {
@@ -752,12 +732,12 @@ int client_chat_person (int sock_fd, char data[DATAMAX])
 /*聊天函数*/
 int client_chat (int sock_fd)
 {
-    char buf[BUFMAX], user[NAMEMAX], data[DATAMAX], time_temp[BUFMAX], cmd_data[DATAMAX];
+    char buf[DATAMAX], user[NAMEMAX], data[DATAMAX], time_temp[BUFMAX], cmd_data[DATAMAX];
     while(1) {
         memset (buf, 0, sizeof (buf)) ;
         memset (data, 0, sizeof (data)) ;
         printf (">>>") ;
-        my_gets (buf) ;
+        client_gets (buf, DATAMAX) ;
         /*向某人发送的私聊消息*/
         if(buf[0] == '@') {
             if(client_chat_person (sock_fd, buf) < 0) {
@@ -792,6 +772,7 @@ int client_chat (int sock_fd)
         }
         /*退出命令*/
         else if(strcmp (buf, "quit") == 0) {
+            printf ("\n客户端退出\n") ;
             close (sock_fd) ;
             return 0 ;
         }
@@ -811,12 +792,12 @@ int client_message (struct cmd  cmd_temp)
     }
     /*消息来源是服务器,系统消息*/
     if(strcmp (cmd_temp.cmd_from, ALL) == 0) {
-        fprintf (stdout, "服务器：%s\n", cmd_temp.cmd_data) ;
+        printf ("\n服务器：%s\n", cmd_temp.cmd_data) ;
     }
     /*消息目标为群发,群消息*/
     else if(strcmp(cmd_temp.cmd_to, ALL) == 0) {
-
-        fprintf (stdout, "%s : %s\n", cmd_temp.cmd_from, data_temp) ;
+        online_list_ptemp = online_list_discover (online_list_PHEAD, cmd_temp.cmd_from) ;
+        printf ("\n%s : %s\n", online_list_ptemp -> user_name, data_temp) ;
         if(client_history_write (cmd_temp.cmd_from, cmd_temp.cmd_to, cmd_temp.cmd_data) < 0) {
             return -1 ;
         }
@@ -824,7 +805,8 @@ int client_message (struct cmd  cmd_temp)
     }
     /*消息目标为自己，私聊消息*/
     else {
-        fprintf (stdout, "%s @ you :%s\n", cmd_temp.cmd_from, data_temp) ;
+        online_list_ptemp = online_list_discover (online_list_PHEAD, cmd_temp.cmd_from) ;
+        printf ("\n%s @ you :%s\n", online_list_ptemp -> user_name, data_temp) ;
         if(client_history_write (cmd_temp.cmd_from, cmd_temp.cmd_to, cmd_temp.cmd_data) < 0) {
             return -1 ;
         }
