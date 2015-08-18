@@ -15,6 +15,8 @@
 #include<netinet/in.h>
 #include<string.h>
 #include<poll.h>
+#include<errno.h>
+#include<time.h>
 
 #define IDMAX 5              /*ID最大长度*/
 #define PASSWARDMAX 40      /*用户密码最大长度*/
@@ -159,6 +161,10 @@ int server_login (int sock_fd, struct cmd *pcmd) ;
 /*****************底层控制函数********************/
 /*错误信息输出*/
 void my_err (const char buf[50], int line) ;
+
+
+/*服务器响应客户端请求日志，注册，登陆，退出*/
+void server_user_log (char user_ID[IDMAX], char flag[BUFMAX]) ;
 
 
 /*创建侦听套结字*/
@@ -668,6 +674,7 @@ int server_register (struct cmd *pcmd, int sock_fd)
         my_err ("send", __LINE__) ;
         return -1 ;
     }
+    server_user_log (user_data_ptemp.user_ID, "register") ;
     printf ("i send end\n") ;
     return 0 ;
 }
@@ -848,6 +855,7 @@ int server_login (int sock_fd, struct cmd *pcmd)
         online_list_PHEAD = online_list_add (online_list_PHEAD, online_list_ptemp) ;
         /*将用户从连接用户列表中删除*/
         link_list_PHEAD = link_list_del (link_list_PHEAD, link_list_ptemp) ;
+        server_user_log (user_ID, "login") ;
         /*给新登陆用户发送登陆成功信息*/
         struct cmd  *cmdptemp = NULL ;
         char user_data [BUFMAX] ;
@@ -905,19 +913,45 @@ void my_err (const char buf[50], int line)
     char time_temp[BUFMAX] ;
     char err[BUFMAX] ;
     char buf_temp[BUFMAX] ;
-    int fd ;
-    if((fd = open ("server_error.log", O_WRONLY | O_CREAT, 0644)) < 0) {
-        exit (1) ;
+    FILE *fp = NULL ;
+    if((fp = fopen ("server_error.log", "a+")) == NULL) {
+        if((fp = fopen ("server_error.log", "w")) == NULL) {
+            exit (1) ;
+        }
+        fclose (fp) ;
+        if((fp = fopen ("server_error.log", "a+")) == NULL) {
+            exit (1) ;
+        }
     }
-    strcpy (buf_temp, buf) ;
-    strcat (buf_temp, "：") ;
-    strcat (buf_temp, strerror (errno)) ;
     server_time_get (time_temp) ;
-    strcat (buf_temp, "\n") ;
-    strcat () ;
-
-    if(write (fd, ))
+    fprintf (fp, "时间：%s\n%s：%s\n", time_temp, buf, strerror (errno)) ;
+    fclose (fp) ;
 }
+
+
+
+/*服务器响应客户端请求日志，注册，登陆，退出*/
+void server_user_log (char user_ID[IDMAX], char flag[BUFMAX])
+{
+    char time_temp[BUFMAX] ;
+    FILE *fp = NULL ;
+    if((fp = fopen ("server_user.log", "a+")) == NULL) {
+        if((fp = fopen ("server_user.log", "w")) == NULL) {
+            my_err ("server_user_log", __LINE__) ;
+            exit (1) ;
+        }
+        fclose (fp) ;
+        if((fp = fopen ("server_user.log", "a+")) == NULL) {
+            my_err ("server_user_log", __LINE__) ;
+            exit (1) ;
+        }
+    }
+    server_time_get (time_temp) ;
+    fprintf (fp, "时间：%s\n%s:%s\n", time_temp, user_ID, flag) ;
+    fclose (fp) ;
+}
+
+
 
 
 
@@ -989,6 +1023,7 @@ int server_recv (struct pollfd  *poll_fd)
             link_list_PHEAD = link_list_del (link_list_PHEAD, link_list_ptemp) ;
         }
         else if((online_list_ptemp = online_list_discover (online_list_PHEAD, poll_fd -> fd)) != NULL) {
+            server_user_log (online_list_ptemp -> user_ID, "quit") ;
             online_list_PHEAD = online_list_del (online_list_PHEAD, online_list_ptemp) ;
         }
         close (poll_fd -> fd) ;
