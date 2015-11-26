@@ -11,6 +11,7 @@
 #include<sys/types.h>
 #include<fcntl.h>
 #include<sys/stat.h>
+#include<string.h>
 #define ELEM_MAX 256
 
 //哈夫曼树结点
@@ -30,10 +31,14 @@ class HuffmanTree {
 
     public :
     HuffmanTree() ;     //构造函数
-    int weight_get(char filename[]) ;     //扫描文件，获得字符频率表
+    int weight_set(char filename[]) ;     //扫描文件，获得字符频率表
+    void weight_set(unsigned char ch, int n) ;    //将字符ch的权值置为num
+    int weight_get(unsigned char ch) ;  //返回ch的权值
     int tree_min(void) ;   //返回n之前的结点中权值最小的一个结点的下标
-    void tree_set(void) ;    //建立哈夫曼树
+    int tree_set(void) ;    //建立哈夫曼树
     void tree_show(void) ;
+    int code_set(void) ;
+    int code_get(unsigned char &ch, char Code[]) ;
 } ;
 
 //哈夫曼树类构造函数
@@ -53,7 +58,7 @@ HuffmanTree :: HuffmanTree()
 }
 
 //获取文件中字符权值表
-int HuffmanTree :: weight_get(char filename[])
+int HuffmanTree :: weight_set(char filename[])
 {
     unsigned char ch = 0 ;
     int fd = 0 ;
@@ -77,6 +82,19 @@ int HuffmanTree :: weight_get(char filename[])
     return filelength ;
 }
 
+//将字符ch的权值置为num
+void HuffmanTree :: weight_set(unsigned char ch, int n)
+{
+    Tree_Table[ch].weight = n ;
+    num++ ;
+}
+
+//返回字符ch的权值
+int HuffmanTree :: weight_get(unsigned char ch)
+{
+    return Tree_Table[ch].weight ;
+}
+
 int HuffmanTree :: tree_min(void)
 {
     int min = 99999999 ;    //假定字符最大权值
@@ -94,11 +112,11 @@ int HuffmanTree :: tree_min(void)
 }
 
 //建立哈夫曼树
-void HuffmanTree :: tree_set(void)
+int HuffmanTree :: tree_set(void)
 {
     int num1 = -1, num2 = -1 ;
     int count = ELEM_MAX ;
-    std :: cout << num << " = " << 2*num-1 << std :: endl ;
+
     for(count = ELEM_MAX; count < ELEM_MAX+num-1; count++) {
         //获取待选结点中权值最小的两个,将其作为当前结点的左右子树
         num1 = tree_min() ;
@@ -120,10 +138,64 @@ void HuffmanTree :: tree_show(void)
         std :: cout << ch << std :: endl ;
         if(Tree_Table[ch].weight > 0) {
             std :: cout << ch << " : " << std :: endl ;
+            std :: cout << "weight : " << Tree_Table[ch].weight << std :: endl ;
             std :: cout << "parent : " << Tree_Table[ch].parent << std :: endl ;
             std :: cout << "Lchild : " << Tree_Table[ch].Lchild << std :: endl ;
             std :: cout << "Rchild : " << Tree_Table[ch].Rchild << std :: endl ;
         }
+    }
+}
+
+//产生哈夫曼编码
+int HuffmanTree :: code_set(void)
+{
+    int count = 0 ;
+    char Stack[ELEM_MAX] ;
+    int Stack_Top = -1 ;
+    int temp = 0 ;
+    int now = 0 ;
+    int now_parent = 0 ;
+
+    //建立哈夫曼树
+    if(tree_set() < 0) {
+        return -1 ;
+    }
+
+    for(count = 0; count < ELEM_MAX; count++) {
+        now = -1 ;
+        now_parent = -1 ;
+        temp = 0 ;
+        if(Tree_Table[count].weight > 0) {
+            now = count ;
+            now_parent = Tree_Table[count].parent ;
+            while(now_parent != -1) {
+                if(Tree_Table[now_parent].Lchild == now) {
+                    Stack[++Stack_Top] = '0' ;
+                }
+                else {
+                    Stack[++Stack_Top] = '1' ;
+                }
+                now = Tree_Table[now].parent ;
+                now_parent = Tree_Table[now_parent].parent ;
+            }
+            while(Stack_Top != -1) {
+                Code_Table[count][temp++] = Stack[Stack_Top--] ;
+            }
+            Code_Table[count][temp] = '\0' ;
+            std :: cout << "Code_Table[" << count << "] : " << Code_Table[count] << std :: endl ;
+        }
+    }
+}
+
+//获取字符ch的哈夫曼编码
+int HuffmanTree :: code_get(unsigned char &ch, char Code[])
+{
+    if(Tree_Table[ch].weight <= 0) {
+        return -1 ;
+    }
+    else {
+        strcpy(Code, Code_Table[ch]) ;
+        return 1 ;
     }
 }
 
