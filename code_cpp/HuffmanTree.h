@@ -37,8 +37,9 @@ class HuffmanTree {
     int tree_min(void) ;   //返回n之前的结点中权值最小的一个结点的下标
     int tree_set(void) ;    //建立哈夫曼树
     void tree_show(void) ;
-    int code_set(void) ;
-    int code_get(unsigned char &ch, char Code[]) ;
+    int code_set(void) ;    //生成哈夫曼编码
+    int code_get(unsigned char &ch, char Code[]) ;  //获取ch对应的哈夫曼编码
+    int code_change(char Code[], unsigned char &ch) ;   //译码函数
 } ;
 
 //哈夫曼树类构造函数
@@ -86,6 +87,7 @@ int HuffmanTree :: weight_set(char filename[])
 void HuffmanTree :: weight_set(unsigned char ch, int n)
 {
     Tree_Table[ch].weight = n ;
+    std :: cout << 
     num++ ;
 }
 
@@ -198,6 +200,22 @@ int HuffmanTree :: code_get(unsigned char &ch, char Code[])
         return 1 ;
     }
 }
+
+//对哈夫曼编码进行译码
+int HuffmanTree :: code_change(char Code[], unsigned char &ch)
+{
+    int count = 0 ;
+    for(count = 0; count < 256; count++) {
+        if(Tree_Table[count].weight > 0) {
+            if(strcmp(Code, Code_Table[count]) == 0) {
+                ch = count ;
+                return 1 ;
+            }
+        }
+    }
+    return -1 ;
+}
+
 
 #endif
 
