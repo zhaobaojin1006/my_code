@@ -12,6 +12,11 @@
 #define CODEMAX 256
 using namespace std;
 
+//整型数转换为二进制字符串
+int myctob(unsigned char ch, char code[]) ;
+
+int codesave(HuffmanTree T, int fd_to) ;
+
 int compress(HuffmanTree T, char filename_from[], char filename_to[]) ;     //对文件内容进行编码替换
 
 int main(void)
@@ -36,7 +41,31 @@ int main(void)
     return 0 ;
 }
 
-int codesave(HuffmanTree T, int fd_to, int &n)
+//字符值转换为二进制字符串
+int myctob(unsigned char ch, char code[])
+{
+    //位运算的基准数，二进制为10000000
+    unsigned char temp = 128 ;
+    unsigned char flag = 0 ;
+    int count = 0 ;
+    //将字符的8位全部对比
+    for(count = 0; count < 8; count++) {
+        flag = ch & temp ;
+        if(flag > 0) {  //与运算结果大于0说明该位为1
+            code[count] = '1' ;
+        }
+        else {
+            code[count] = '0' ;
+        }
+        temp = temp >> 1 ;  //temp右移一位
+    }
+    code[count] = '\0' ;
+    std :: cout << code << std :: endl ;
+    return 1 ;
+}
+
+
+int codesave(HuffmanTree T, int fd_to)
 {
     int num = 0 ;
     int count = 0 ;
@@ -49,12 +78,10 @@ int codesave(HuffmanTree T, int fd_to, int &n)
             if(write(fd_to, &ch, sizeof(unsigned char)) < 0) {
                 return -1 ;
             }
-            n++ ;
             //存储权值
             if(write(fd_to, &num, sizeof(int)) < 0) {
                 return -1 ;
             }
-            n = n + 4 ;
         }
     }
     //用*分隔文件头信息和正文
@@ -62,14 +89,12 @@ int codesave(HuffmanTree T, int fd_to, int &n)
     if(write(fd_to, &ch, sizeof(unsigned char)) < 0) {
         return -1 ;
     }
-    n++ ;
-    std :: cout << "now n = " << n << std :: endl ;
     return 1 ;
 }
 
 int compress(HuffmanTree T, char filename_from[], char filename_to[])
 {
-    int n = 0 ;
+    long filesize = 0 ;
     int fd_from = 0 ;
     int fd_to = 0 ;
     unsigned char step = 0 ;
@@ -86,19 +111,19 @@ int compress(HuffmanTree T, char filename_from[], char filename_to[])
     if((fd_to = open(filename_to, O_WRONLY | O_CREAT, 0744)) < 0) {
         std :: cout << "file open failed " << std :: endl ;
     }
-    //预留存储最后一个字符实际编码的位置
-    if(write(fd_to, &ch, sizeof(char)) < 0) {
+    //预留存储源文件长度信息的位置 long型
+    if(write(fd_to, &filesize, sizeof(long)) < 0) {
         return -1 ;
     }
-    n++ ;   //文件长度加1
     //添加哈夫曼树结点信息
-    if(codesave(T, fd_to, n) < 0) {
+    if(codesave(T, fd_to) < 0) {
         return -1 ;
     }
     //每次从源文件读取一个字符进行编码
     while(read(fd_from, &ch, sizeof(char)) == 1) {
         count = 0 ;
         T.code_get(ch, code) ;
+        filesize++ ;   //文件长度加1
 
         while(code[count] != '\0') {
             //根据哈夫曼编码对temp变量进行位操作
@@ -115,19 +140,16 @@ int compress(HuffmanTree T, char filename_from[], char filename_to[])
                 if(write(fd_to, &temp, sizeof(char)) < 1) {
                     return -1 ;
                 }
-                std :: cout << "the temp = "<< temp << std :: endl ;
                 step = 0 ;
-                n++ ;   //文件长度加1
             }
         }
     } 
     if(step != 0) {     //若最后的字符编码后不足8位，则在后面补0，并记录实际编码的位数
-        std :: cout << "step = " << (int)step << std :: endl ;
         //将文件指针移到文件开始位置
         if(lseek(fd_to, 0, SEEK_SET) < 0) {
             return -1 ;
         }
-        if(write(fd_to, &step, sizeof(char)) < 0) {
+        if(write(fd_to, &filesize, sizeof(long)) < 0) {
             return -1 ;
         }
         //文件指针移回文件尾
@@ -140,9 +162,8 @@ int compress(HuffmanTree T, char filename_from[], char filename_to[])
         if(write(fd_to, &temp, sizeof(char)) < 1) {
             return -1 ;
         }
-        n++ ;
-        std :: cout << "n = " << n << std ::endl ;
     }
+    std :: cout << "filesize = " << filesize << std :: endl ;
     close(fd_from) ;
     close(fd_to) ;
 }
