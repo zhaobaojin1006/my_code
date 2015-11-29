@@ -49,7 +49,6 @@ int main(void)
         std :: cout << "file open failed " << std :: endl ;
         return -1 ;
     }
-    T.tree_show() ;
     //解压文件
     decompress(T, fd_from, fd_to, filesize) ;
 
@@ -92,26 +91,26 @@ int filemessage(HuffmanTree &T, int fd_from, long &filesize)
     if(read(fd_from, &filesize, sizeof(long)) < 0) {
         return -1 ;
     }
-    while(read(fd_from, &ch, sizeof(unsigned char)) == 1) {
-        if(ch == '*') {
-            break ;
+    std :: cout << filesize << std :: endl ;
+    //读取文件字符频率并输入哈夫曼树类
+    for(n = 0; n < 256; n++) {
+        if(read(fd_from, &ch, sizeof(unsigned char)) < 1) {
+            return -1 ;
         }
-        else {
-            if(read(fd_from, &num, sizeof(int)) < 4) {
-                return -1 ;
-            }
-            std :: cout << "the ch = " << (int)ch << std :: endl ;
-            std :: cout << "the num = " << num << std ::endl ;
-            n = n + 5 ;
-            //读取文件字符频率并输入哈夫曼树类
-            T.weight_set(ch, num) ;
+        if(read(fd_from, &num, sizeof(int)) < 4) {
+            return -1 ;
         }
+        std :: cout << "the ch = " << (int)ch << std :: endl ;
+        std :: cout << "the num = " << num << std ::endl ;
+        //输入哈夫曼树类
+        T.weight_set(ch, num) ;
     }
-    std :: cout << n << std :: endl ;
     //生成哈夫曼编码
     if(T.code_set() < 0) {
         return -1 ;
     }
+
+    T.tree_show() ;
     return 1 ;
 }
 
@@ -126,22 +125,23 @@ int decompress(HuffmanTree &T, int fd_from, int fd_to, long filesize)
     int n = 0 ;
     long num = 0 ;  //记录当前翻译了多少字符
 
+    std :: cout << "filesize = " << filesize << std :: endl ;
     //每次从源文件中读取字符进行翻译
     while(read(fd_from, &ch, sizeof(unsigned char)) == 1) {
-        std :: cout << " n = " << n++ <<std :: endl ;
         //获取二进制字符串
         myctob(ch, code_temp) ;
+       
         //对二进制字符串进行译码
         for(count = 0; count < 8; count++) {
             code[step++] = code_temp[count] ;
             code[step] = '\0' ;
-            if(T.code_change(code, c) > 0) {    //译码成功
-                std :: cout << "c : " << c << std :: endl ;
+            if(T.code_change(code, c) > 0) { 
+                //译码成功
                 if(write(fd_to, &c, sizeof(unsigned char)) < 0) {   //将字符c写入目标文件
                     return -1 ;
                 }
-                num++ ;
-                if(num == filesize) {   //翻译的字符数等于源文件字符数
+                if(++num == filesize) {   //翻译的字符数等于源文件字符数
+                    std :: cout << "num = " << num << std :: endl ;
                     break ;
                 }
                 step = 0 ;  //code重新开始记录编码

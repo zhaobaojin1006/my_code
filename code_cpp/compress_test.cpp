@@ -72,22 +72,17 @@ int codesave(HuffmanTree T, int fd_to)
     unsigned char ch = 0 ;
     for(count = 0; count < 256; count++) {
         ch = (unsigned char)count ;
-        if((num = T.weight_get(ch)) > 0) {
-            std :: cout << (int)ch << " : " << num << std :: endl ;
-            //存储字符
-            if(write(fd_to, &ch, sizeof(unsigned char)) < 0) {
-                return -1 ;
-            }
-            //存储权值
-            if(write(fd_to, &num, sizeof(int)) < 0) {
-                return -1 ;
-            }
+        num = T.weight_get(ch) ;
+        std :: cout << (int)ch << " : " << num << std :: endl ;
+        //存储字符
+        if(write(fd_to, &ch, sizeof(unsigned char)) < 0) {
+            return -1 ;
         }
-    }
-    //用*分隔文件头信息和正文
-    ch = '*' ;
-    if(write(fd_to, &ch, sizeof(unsigned char)) < 0) {
-        return -1 ;
+        //存储权值
+        if(write(fd_to, &num, sizeof(int)) < 0) {
+            return -1 ;
+        }
+        std :: cout << "ch = " << ch << "num = " << num << std :: endl ;
     }
     return 1 ;
 }
@@ -143,26 +138,27 @@ int compress(HuffmanTree T, char filename_from[], char filename_to[])
                 step = 0 ;
             }
         }
-    } 
+    }
     if(step != 0) {     //若最后的字符编码后不足8位，则在后面补0，并记录实际编码的位数
-        //将文件指针移到文件开始位置
-        if(lseek(fd_to, 0, SEEK_SET) < 0) {
-            return -1 ;
-        }
-        if(write(fd_to, &filesize, sizeof(long)) < 0) {
-            return -1 ;
-        }
-        //文件指针移回文件尾
-        if(lseek(fd_to, 0, SEEK_END) < 0) {
-            return -1 ;
-        }
-        while(++step < 8) {
+        while(++step <= 8) {
             temp = temp << 1 ;
         }
         if(write(fd_to, &temp, sizeof(char)) < 1) {
             return -1 ;
         }
     }
+    //将文件指针移到文件开始位置
+    if(lseek(fd_to, 0, SEEK_SET) < 0) {
+        return -1 ;
+    }
+    if(write(fd_to, &filesize, sizeof(long)) < 0) {
+        return -1 ;
+    }
+    //文件指针移回文件尾
+    if(lseek(fd_to, 0, SEEK_END) < 0) {
+        return -1 ;
+    }
+ 
     std :: cout << "filesize = " << filesize << std :: endl ;
     close(fd_from) ;
     close(fd_to) ;

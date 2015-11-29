@@ -76,7 +76,6 @@ int HuffmanTree :: weight_set(char filename[])
             num++ ;
         }
         Tree_Table[ch].weight++ ;   //字符权值加1
-        std :: cout << ch << " : " << Tree_Table[ch].weight << std :: endl ;
         filelength++ ;  //文件长度增加1
     }
     close(fd) ;
@@ -87,8 +86,9 @@ int HuffmanTree :: weight_set(char filename[])
 void HuffmanTree :: weight_set(unsigned char ch, int n)
 {
     Tree_Table[ch].weight = n ;
-    std :: cout << 
-    num++ ;
+    if(n > 0) {
+        num++ ;
+    }
 }
 
 //返回字符ch的权值
