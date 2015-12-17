@@ -16,11 +16,19 @@ using std :: cout ;
 using std :: endl ;
 using std :: string ;
 
-int main(void)
+int main(int argc, char* argv[])
 {
-    char a1 , a2, a3 ;
-    scanf("%c %c", &a1, &a2) ;
-    a3= getchar() ;
-    printf("%c, %c, %c", a1, a2, a3) ;
+    string str ;
+    string str_temp ;
+    vector<string> v ;
+    int count = 0 ;
+    for(count = 0; count < argc; count++) {
+        str = argv[count] ;
+        v.push_back(str) ;
+    }
+    for(count = 0; count < argc; count++) {
+        str = str + v[count] ;
+    }
+    cout << str << endl ;
     return 0 ;
 }
