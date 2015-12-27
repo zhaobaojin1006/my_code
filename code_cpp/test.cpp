@@ -9,6 +9,7 @@
 #include<stdio.h>
 #include<cctype>
 #include<vector>
+#include<initializer_list>
 using namespace std ;
 using std :: vector ;
 using std :: cin ;
@@ -16,19 +17,17 @@ using std :: cout ;
 using std :: endl ;
 using std :: string ;
 
+int &func(int *a, int index)
+{
+    return a[index] ;
+}
+
 int main(int argc, char* argv[])
 {
-    string str ;
-    string str_temp ;
-    vector<string> v ;
-    int count = 0 ;
-    for(count = 0; count < argc; count++) {
-        str = argv[count] ;
-        v.push_back(str) ;
+    int a[10] ;
+    for(int i = 0; i < 10; i++) {
+        func(a, i) = i ;
+        cout << a[i] << endl ;
     }
-    for(count = 0; count < argc; count++) {
-        str = str + v[count] ;
-    }
-    cout << str << endl ;
     return 0 ;
 }
