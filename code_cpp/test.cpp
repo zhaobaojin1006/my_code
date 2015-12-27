@@ -17,17 +17,21 @@ using std :: cout ;
 using std :: endl ;
 using std :: string ;
 
-int &func(int *a, int index)
+int func(vector<int> :: iterator index, vector<int> :: iterator end)
 {
-    return a[index] ;
+    if(index < end) {
+        func(index+1, end) ;
+    }
+    else {
+        return 0 ;
+    }
+    cout << *index << endl ;
+    return 0 ;
 }
 
 int main(int argc, char* argv[])
 {
-    int a[10] ;
-    for(int i = 0; i < 10; i++) {
-        func(a, i) = i ;
-        cout << a[i] << endl ;
-    }
+    vector<int> a({1,2,3,4,5,6,7,8,9,}) ;
+    func(a.begin(), a.end()) ;
     return 0 ;
 }
