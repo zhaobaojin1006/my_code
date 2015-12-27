@@ -17,10 +17,10 @@ using std :: cout ;
 using std :: endl ;
 using std :: string ;
 
-int func(vector<int> :: iterator index, vector<int> :: iterator end)
+int func(vector<int> &temp, vector<int> :: iterator index)
 {
-    if(index < end) {
-        func(index+1, end) ;
+    if(index != temp.end()) {
+        func(temp, index+1) ;
     }
     else {
         return 0 ;
@@ -32,6 +32,6 @@ int func(vector<int> :: iterator index, vector<int> :: iterator end)
 int main(int argc, char* argv[])
 {
     vector<int> a({1,2,3,4,5,6,7,8,9,}) ;
-    func(a.begin(), a.end()) ;
+    func(a, a.begin()) ;
     return 0 ;
 }
